@@ -50,15 +50,11 @@ values
   ('Cointelegraph - Market News', 'https://cointelegraph.com/tags/market-news', 'https://cointelegraph.com/rss/tag/market-news', 'en', 2, true),
 
   -- ZH (RSS may be absent/unstable; ingest script will attempt RSS auto-discovery when rss_url is null)
-  ('金色财经', 'https://www.jinse.cn/', null, 'zh', 3, true),
   ('Odaily 星球日报', 'https://www.odaily.news/', 'https://rss.odaily.news/rss/newsflash', 'zh', 3, true),
   ('PANews', 'https://www.panewslab.com/', 'https://www.panewslab.com/en/rss/newsflash.xml', 'zh', 3, true),
   -- BlockBeats Flash/快讯 RSS (你提供的可用地址)
   ('BlockBeats 律动', 'https://www.theblockbeats.info/', 'https://api.theblockbeats.news/v1/open-api/home-xml', 'zh', 3, true),
   ('链捕手 ChainCatcher', 'https://www.chaincatcher.com/', 'https://www.chaincatcher.com/rss/clist', 'zh', 2, true),
-  ('深潮 TechFlow', 'https://www.techflowpost.com/', null, 'zh', 2, true),
-  ('Foresight News', 'https://foresightnews.pro/', null, 'zh', 2, true),
-  ('吴说区块链', 'https://wublockchain.xyz/', null, 'zh', 2, true)
 on conflict (homepage_url) do nothing;
 
 

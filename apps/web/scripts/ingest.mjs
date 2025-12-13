@@ -2,7 +2,8 @@ import RSSParser from "rss-parser";
 import { createClient } from "@supabase/supabase-js";
 
 const MERGE_WINDOW_HOURS = 48;
-const HOT_WINDOW_HOURS = 24;
+// Hot ranking is computed via Supabase view `stories_feed_hot_24h` at query time.
+// We intentionally avoid re-writing hot scores in the ingest job to keep runtime low.
 const MAX_STORY_CANDIDATES = 250;
 const TITLE_SIM_THRESHOLD_EN = 0.78;
 const TITLE_SIM_THRESHOLD_ZH = 0.72;
@@ -294,7 +295,8 @@ async function main() {
         candTokenCache.set(st.id, toks);
       }
 
-      for (const item of items.slice(0, 50)) {
+      // Limit items processed per source per run to keep the job within GitHub Actions timeouts.
+      for (const item of items.slice(0, 25)) {
         const link = item.link || item.guid;
         const title = (item.title || "").trim();
         if (!link || !title) continue;
@@ -382,25 +384,7 @@ async function main() {
         .update({ last_fetch_at: nowIso(), last_error: null })
         .eq("id", source.id);
 
-      // Recompute hot_score for stories updated in last 24h (cheap enough for MVP)
-      const hotStart = hoursAgoIso(HOT_WINDOW_HOURS);
-      const { data: hotStories, error: hsErr } = await supabase
-        .from("stories_feed_hot_24h")
-        .select("id,hot_score_calc,last_seen_at")
-        .gte("last_seen_at", hotStart)
-        .order("hot_score_calc", { ascending: false })
-        .limit(500);
-      if (hsErr) throw hsErr;
-
-      // Batch update with small chunks
-      const chunk = 100;
-      for (let i = 0; i < hotStories.length; i += chunk) {
-        const part = hotStories.slice(i, i + chunk);
-        // Update one by one to avoid needing custom SQL
-        for (const st of part) {
-          await supabase.from("stories").update({ hot_score: st.hot_score_calc }).eq("id", st.id);
-        }
-      }
+      // Note: do not recompute and persist hot_score here (avoids thousands of writes per run).
 
       const ms = Date.now() - started;
       console.log(`- ${source.name}: inserted=${inserted} (${ms}ms)`);

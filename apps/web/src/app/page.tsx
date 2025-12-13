@@ -13,7 +13,7 @@ export default async function Home({
   searchParams: Promise<{ sort?: string; lang?: string }>;
 }) {
   const sp = await searchParams;
-  const sort = (sp.sort ?? "hot").toString() as "hot" | "new";
+  const sort = (sp.sort ?? "new").toString() as "hot" | "new";
   const lang = (sp.lang ?? "all").toString() as "all" | "en" | "zh";
 
   const items = await listStories({ sort, lang, limit: 30, offset: 0 });
@@ -39,21 +39,21 @@ export default async function Home({
           <div className="flex gap-2">
             <button
               name="sort"
-              value="hot"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                sort === "hot" ? "bg-zinc-900 text-white" : "bg-white text-zinc-800 border border-zinc-200"
-              }`}
-            >
-              Hot (24h)
-            </button>
-            <button
-              name="sort"
               value="new"
               className={`rounded-lg px-3 py-2 text-sm ${
                 sort === "new" ? "bg-zinc-900 text-white" : "bg-white text-zinc-800 border border-zinc-200"
               }`}
             >
               New
+            </button>
+            <button
+              name="sort"
+              value="hot"
+              className={`rounded-lg px-3 py-2 text-sm ${
+                sort === "hot" ? "bg-zinc-900 text-white" : "bg-white text-zinc-800 border border-zinc-200"
+              }`}
+            >
+              Hot (24h)
             </button>
           </div>
           <select
