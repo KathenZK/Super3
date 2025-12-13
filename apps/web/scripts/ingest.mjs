@@ -14,6 +14,23 @@ function mustGetEnv(name) {
   return v;
 }
 
+function parseIntEnv(name, fallback) {
+  const v = process.env[name];
+  if (!v) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function hash32(str) {
+  // Simple stable non-crypto hash for sharding
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -231,6 +248,8 @@ function parseItemDate(item) {
 async function main() {
   const SUPABASE_URL = mustGetEnv("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = mustGetEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const SHARD_TOTAL = Math.max(1, parseIntEnv("SHARD_TOTAL", 1));
+  const SHARD_INDEX = Math.min(Math.max(0, parseIntEnv("SHARD_INDEX", 0)), SHARD_TOTAL - 1);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -250,9 +269,16 @@ async function main() {
     .order("weight", { ascending: false });
 
   if (sourcesErr) throw sourcesErr;
-  console.log(`[${nowIso()}] sources=${sources.length}`);
+  const allSources = sources ?? [];
+  const shardSources =
+    SHARD_TOTAL === 1
+      ? allSources
+      : allSources.filter((s) => hash32(String(s.id)) % SHARD_TOTAL === SHARD_INDEX);
+  console.log(
+    `[${nowIso()}] shard=${SHARD_INDEX}/${SHARD_TOTAL} sources=${shardSources.length} (total=${allSources.length})`,
+  );
 
-  for (const source of sources) {
+  for (const source of shardSources) {
     const started = Date.now();
     try {
       let rssUrl = source.rss_url;

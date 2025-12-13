@@ -54,7 +54,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="mt-2 text-sm text-zinc-700">{s.article_title}</div>
             {s.excerpt ? (
-              <div className="mt-2 whitespace-pre-wrap break-words text-sm text-zinc-600">
+              <div className="mt-2 whitespace-pre-wrap wrap-break-word text-sm text-zinc-600">
                 {s.excerpt}
               </div>
             ) : null}

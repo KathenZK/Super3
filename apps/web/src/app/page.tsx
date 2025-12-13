@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { listStories } from "@/lib/stories";
-
-function fmt(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-}
+import { StoryFeed } from "./_components/StoryFeed";
 
 export default async function Home({
   searchParams,
@@ -70,35 +65,7 @@ export default async function Home({
           </button>
         </form>
 
-        <div className="mt-6 space-y-3">
-          {items.map((st) => (
-            <Link
-              key={st.id}
-              href={`/story/${st.id}`}
-              className="block rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-300"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs text-zinc-500">{st.lang.toUpperCase()}</div>
-                <div className="text-xs text-zinc-500">{fmt(st.last_seen_at)}</div>
-              </div>
-              <div className="mt-2 text-sm font-medium text-zinc-900">{st.title}</div>
-              {st.excerpt ? (
-                <div className="mt-2 whitespace-pre-wrap break-words text-sm text-zinc-600">
-                  {st.excerpt}
-                </div>
-              ) : null}
-              {st.sources_preview.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-600">
-                  {st.sources_preview.map((s) => (
-                    <span key={s.name} className="rounded-full bg-zinc-100 px-2 py-1">
-                      {s.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </Link>
-          ))}
-        </div>
+        <StoryFeed initialItems={items} sort={sort} lang={lang} />
       </main>
     </div>
   );

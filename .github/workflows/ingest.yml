@@ -2,13 +2,20 @@ name: ingest
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    concurrency:
+      group: ingest-${{ github.ref }}-${{ matrix.shard }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +34,8 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SHARD_TOTAL: "4"
+          SHARD_INDEX: "${{ matrix.shard }}"
         run: npm run ingest
 
 

@@ -7,14 +7,14 @@ Web3 新闻聚合（Stories-first）：先把同一事件在多个站点/多篇�
 - `apps/web`: Next.js（页面 + API + 采集脚本）
 - `supabase/schema.sql`: 数据表 + 视图
 - `supabase/seeds/seed_sources.sql`: 默认 30 站种子（EN:22 / ZH:8，RSS 优先；中文源后续可替换扩充）
-- `.github/workflows/ingest.yml`: GitHub Actions 定时采集（每 30 分钟）
+- `.github/workflows/ingest.yml`: GitHub Actions 定时采集（每 5 分钟，4 分片并行）
 
 ## 你将得到的功能
 
 - **首页**：Hot(24h) / New（Story 粒度）+ 语言过滤（EN/ZH/All）
 - **搜索**：关键词搜索 Story（MVP 先做标题匹配）
 - **Story 详情**：列出该 Story 下的全部来源文章
-- **采集**：30 分钟抓一次 RSS → 入库 → 48h 严格合并 → 计算 24h 热榜分数
+- **采集**：每 5 分钟抓一次 RSS（4 分片并行）→ 入库 → 48h 严格合并 → 24h 热榜实时计算（view）
 
 ## Supabase 初始化
 

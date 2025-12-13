@@ -65,7 +65,7 @@ export default async function SearchPage({
             </div>
             <div className="mt-2 text-sm font-medium text-zinc-900">{st.title}</div>
             {st.excerpt ? (
-              <div className="mt-2 whitespace-pre-wrap break-words text-sm text-zinc-600">
+              <div className="mt-2 whitespace-pre-wrap wrap-break-word text-sm text-zinc-600">
                 {st.excerpt}
               </div>
             ) : null}
