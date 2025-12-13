@@ -6,7 +6,7 @@ Web3 新闻聚合（Stories-first）：先把同一事件在多个站点/多篇�
 
 - `apps/web`: Next.js（页面 + API + 采集脚本）
 - `supabase/schema.sql`: 数据表 + 视图
-- `supabase/seeds/seed_sources.sql`: 默认 30 站种子（EN:21 / ZH:9，RSS 优先；中文源后续可替换扩充）
+- `supabase/seeds/seed_sources.sql`: 默认 30 站种子（EN:22 / ZH:8，RSS 优先；中文源后续可替换扩充）
 - `.github/workflows/ingest.yml`: GitHub Actions 定时采集（每 30 分钟）
 
 ## 你将得到的功能

@@ -1,4 +1,4 @@
--- Seed default sources (EN:21, ZH:9)
+-- Seed default sources (EN:22, ZH:8)
 -- Run after schema.sql in Supabase SQL Editor.
 
 insert into public.sources (name, homepage_url, rss_url, lang, weight, enabled)
@@ -28,6 +28,7 @@ values
   ('U.Today', 'https://u.today/', 'https://u.today/rss.php', 'en', 2, true),
   ('CryptoNews', 'https://cryptonews.com/', 'https://cryptonews.com/feed/', 'en', 2, true),
   ('The Block', 'https://www.theblock.co/', 'https://www.theblock.co/rss.xml', 'en', 2, true),
+  ('CryptoDaily', 'https://cryptodaily.co.uk/', 'https://cryptodaily.co.uk/feed/', 'en', 2, true),
 
   -- ZH (RSS may be absent/unstable; ingest script will attempt RSS auto-discovery when rss_url is null)
   ('金色财经', 'https://www.jinse.cn/', null, 'zh', 3, true),
