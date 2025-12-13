@@ -29,7 +29,11 @@ async function fetchTextWithRetry(url, opts, retries = 2) {
   let lastErr = null;
   for (let i = 0; i <= retries; i++) {
     try {
-      const res = await fetch(url, opts);
+      const controller = new AbortController();
+      const timeoutMs = 12000;
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, { ...opts, signal: controller.signal });
+      clearTimeout(t);
       if (res.ok) return await res.text();
 
       // Retry on typical transient responses
