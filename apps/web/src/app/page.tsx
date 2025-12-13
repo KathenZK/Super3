@@ -19,7 +19,7 @@ export default async function Home({
   const items = await listStories({ sort, lang, limit: 30, offset: 0 });
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-white">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
