@@ -21,6 +21,32 @@ function hoursAgoIso(hours) {
   return new Date(Date.now() - hours * 3600 * 1000).toISOString();
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchTextWithRetry(url, opts, retries = 2) {
+  let lastErr = null;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok) return await res.text();
+
+      // Retry on typical transient responses
+      const retryable = new Set([408, 429, 502, 503, 504]);
+      if (!retryable.has(res.status) || i === retries) {
+        throw new Error(`${res.status} ${res.statusText}`);
+      }
+      await sleep(800 * (i + 1));
+    } catch (e) {
+      lastErr = e;
+      if (i === retries) break;
+      await sleep(800 * (i + 1));
+    }
+  }
+  throw lastErr ?? new Error("fetch failed");
+}
+
 function normalizeUrl(raw) {
   try {
     const u = new URL(raw);
@@ -135,12 +161,14 @@ function jaccard(a, b) {
 }
 
 async function discoverRssUrl(homepageUrl) {
-  const res = await fetch(homepageUrl, {
-    redirect: "follow",
-    headers: { "user-agent": "Super3MVP/1.0 (RSS discovery)" },
-  });
-  if (!res.ok) throw new Error(`RSS discovery fetch failed: ${res.status} ${res.statusText}`);
-  const html = await res.text();
+  const html = await fetchTextWithRetry(
+    homepageUrl,
+    {
+      redirect: "follow",
+      headers: { "user-agent": "Super3MVP/1.0 (RSS discovery)" },
+    },
+    1,
+  );
   const linkRe =
     /<link[^>]+type=["']application\/(?:rss|atom)\+xml["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
   const m = linkRe.exec(html);
@@ -153,12 +181,19 @@ async function discoverRssUrl(homepageUrl) {
 }
 
 async function fetchRssXml(rssUrl) {
-  const res = await fetch(rssUrl, {
-    redirect: "follow",
-    headers: { "user-agent": "Super3MVP/1.0 (RSS fetch)" },
-  });
-  if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${res.statusText}`);
-  return await res.text();
+  try {
+    return await fetchTextWithRetry(
+      rssUrl,
+      {
+        redirect: "follow",
+        headers: { "user-agent": "Super3MVP/1.0 (RSS fetch)" },
+      },
+      2,
+    );
+  } catch (e) {
+    const msg = e?.message ? String(e.message) : String(e);
+    throw new Error(`RSS fetch failed: ${msg}`);
+  }
 }
 
 function parseItemDate(item) {

@@ -1,0 +1,17 @@
+# Cursor Rules (repo-level)
+#
+# Goal: make Cursor's AI-generated git commit messages follow a consistent
+# Chinese "summary + details" format (Conventional Commits).
+#
+# If you use Cursor's "Generate Commit Message", output MUST be:
+# <type>: <中文概述>
+#
+# <中文详情（1-4 行，说明改了什么/为什么）>
+# 修改了 N 个文件。
+#
+# Constraints:
+# - Plain text only (no markdown / bullets / code fences)
+# - type ∈ feat|fix|refactor|perf|docs|test|chore
+# - "修改了 N 个文件。" only when N is known; do not guess
+
+
