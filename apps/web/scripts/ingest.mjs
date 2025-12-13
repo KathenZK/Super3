@@ -283,7 +283,7 @@ async function main() {
         const canonical_url = normalizeUrl(url);
         const published_at = parseItemDate(item);
         const excerpt =
-          (item.contentSnippet || item.summary || "").toString().slice(0, 500) || null;
+          (item.contentSnippet || item.summary || "").toString().slice(0, 2000) || null;
 
         const { data: existing, error: exErr } = await supabase
           .from("articles")

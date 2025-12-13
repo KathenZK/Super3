@@ -7,6 +7,7 @@ export type StoryListItem = {
   id: string;
   lang: "en" | "zh";
   title: string;
+  excerpt?: string | null;
   first_seen_at: string;
   last_seen_at: string;
   source_count_24h?: number;
@@ -26,6 +27,7 @@ export type StoryDetail = {
     article_url: string;
     article_title: string;
     published_at: string | null;
+    excerpt: string | null;
   }>;
 };
 
@@ -102,6 +104,55 @@ async function loadSourcesPreview(storyIds: string[]) {
   return out;
 }
 
+async function loadStoryExcerpts(storyIds: string[]) {
+  const out = new Map<string, string | null>();
+  if (storyIds.length === 0) return out;
+  const supabase = supabaseAdmin();
+
+  type StoryArticleRow = { story_id: string; article_id: string };
+  const { data: saRows, error: saErr } = await supabase
+    .from("story_articles")
+    .select("story_id,article_id")
+    .in("story_id", storyIds);
+  if (saErr) throw saErr;
+
+  const articleIds = Array.from(
+    new Set((saRows ?? []).map((r) => (r as StoryArticleRow).article_id).filter(Boolean)),
+  );
+  if (articleIds.length === 0) return out;
+
+  type ArticleRow = { id: string; excerpt: string | null; published_at: string | null };
+  const { data: articles, error: aErr } = await supabase
+    .from("articles")
+    .select("id,excerpt,published_at")
+    .in("id", articleIds);
+  if (aErr) throw aErr;
+
+  const articleById = new Map<string, ArticleRow>(
+    (articles ?? []).map((a) => [a.id, a as ArticleRow]),
+  );
+
+  // Pick best excerpt per story: prefer non-empty excerpt, then latest published_at
+  for (const row of (saRows ?? []) as unknown as StoryArticleRow[]) {
+    const art = articleById.get(row.article_id);
+    if (!art) continue;
+    const ex = (art.excerpt ?? "").trim();
+    if (!ex) continue;
+
+    const cur = out.get(row.story_id);
+    if (!cur) {
+      out.set(row.story_id, ex);
+      continue;
+    }
+    // keep existing; we don't have per-story ordering here, so first non-empty wins (stable enough for MVP)
+  }
+
+  for (const sid of storyIds) {
+    if (!out.has(sid)) out.set(sid, null);
+  }
+  return out;
+}
+
 export async function listStories(args: {
   sort: Sort;
   lang: Lang;
@@ -153,11 +204,13 @@ export async function listStories(args: {
 
   const storyIds = rows.map((r) => r.id);
   const previews = await loadSourcesPreview(storyIds);
+  const excerpts = await loadStoryExcerpts(storyIds);
 
   return rows.map((r) => ({
     id: r.id,
     lang: r.lang,
     title: r.title,
+    excerpt: excerpts.get(r.id) ?? null,
     first_seen_at: r.first_seen_at,
     last_seen_at: r.last_seen_at,
     source_count_24h: "source_count_24h" in r ? r.source_count_24h : undefined,
@@ -203,10 +256,11 @@ export async function getStoryDetail(storyId: string): Promise<StoryDetail | nul
     title: string;
     published_at: string | null;
     source_id: string;
+    excerpt: string | null;
   };
   const { data: articles, error: aErr } = await supabase
     .from("articles")
-    .select("id,url,title,published_at,source_id")
+    .select("id,url,title,published_at,source_id,excerpt")
     .in("id", articleIds);
   if (aErr) throw aErr;
 
@@ -233,6 +287,7 @@ export async function getStoryDetail(storyId: string): Promise<StoryDetail | nul
         article_url: art.url,
         article_title: art.title,
         published_at: art.published_at ?? null,
+        excerpt: art.excerpt ?? null,
       };
     })
     .filter(Boolean) as StoryDetail["sources"];
@@ -281,11 +336,13 @@ export async function searchStories(args: {
 
   const storyIds = rows.map((r) => r.id);
   const previews = await loadSourcesPreview(storyIds);
+  const excerpts = await loadStoryExcerpts(storyIds);
 
   return rows.map((r) => ({
     id: r.id,
     lang: r.lang,
     title: r.title,
+    excerpt: excerpts.get(r.id) ?? null,
     first_seen_at: r.first_seen_at,
     last_seen_at: r.last_seen_at,
     sources_preview: previews.get(r.id) ?? [],

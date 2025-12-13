@@ -82,6 +82,11 @@ export default async function Home({
                 <div className="text-xs text-zinc-500">{fmt(st.last_seen_at)}</div>
               </div>
               <div className="mt-2 text-sm font-medium text-zinc-900">{st.title}</div>
+              {st.excerpt ? (
+                <div className="mt-2 whitespace-pre-wrap break-words text-sm text-zinc-600">
+                  {st.excerpt}
+                </div>
+              ) : null}
               {st.sources_preview.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-600">
                   {st.sources_preview.map((s) => (
