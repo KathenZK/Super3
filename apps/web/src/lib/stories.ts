@@ -37,27 +37,52 @@ async function loadSourcesPreview(storyIds: string[]) {
   if (storyIds.length === 0) return new Map<string, Array<{ name: string; url: string }>>();
   const supabase = supabaseAdmin();
 
-  type SourceJoin = { name: string; homepage_url: string | null; weight: number | null };
-  type ArticleJoin = { url: string; published_at: string | null; sources: SourceJoin | null };
-  type StoryArticleJoinRow = { story_id: string; articles: ArticleJoin | null };
+  // IMPORTANT:
+  // Avoid PostgREST nested relationship syntax (e.g. sources:source_id(...))
+  // because it depends on foreign key inference and schema cache; instead do
+  // two-step queries and join in code for robustness.
 
-  const { data, error } = await supabase
+  type StoryArticleRow = { story_id: string; article_id: string };
+  const { data: saRows, error: saErr } = await supabase
     .from("story_articles")
-    .select(
-      "story_id, articles:article_id(url, published_at, sources:source_id(name, homepage_url, weight))",
-    )
+    .select("story_id,article_id")
     .in("story_id", storyIds);
+  if (saErr) throw saErr;
 
-  if (error) throw error;
+  const articleIds = Array.from(
+    new Set((saRows ?? []).map((r) => (r as StoryArticleRow).article_id).filter(Boolean)),
+  );
+  if (articleIds.length === 0) return new Map<string, Array<{ name: string; url: string }>>();
+
+  type ArticleRow = { id: string; url: string; source_id: string };
+  const { data: articles, error: aErr } = await supabase
+    .from("articles")
+    .select("id,url,source_id")
+    .in("id", articleIds);
+  if (aErr) throw aErr;
+
+  const sourceIds = Array.from(new Set((articles ?? []).map((a) => (a as ArticleRow).source_id)));
+  type SourceRow = { id: string; name: string; homepage_url: string | null };
+  const { data: sources, error: sErr } = await supabase
+    .from("sources")
+    .select("id,name,homepage_url")
+    .in("id", sourceIds);
+  if (sErr) throw sErr;
+
+  const articleById = new Map<string, ArticleRow>(
+    (articles ?? []).map((a) => [a.id, a as ArticleRow]),
+  );
+  const sourceById = new Map<string, SourceRow>((sources ?? []).map((s) => [s.id, s as SourceRow]));
 
   const out = new Map<string, Array<{ name: string; url: string }>>();
-  for (const row of (data ?? []) as unknown as StoryArticleJoinRow[]) {
+  for (const row of (saRows ?? []) as unknown as StoryArticleRow[]) {
     const sid = row.story_id;
-    const article = row.articles;
-    const source = article?.sources;
-    if (!sid || !source?.name || !article?.url) continue;
+    const art = articleById.get(row.article_id);
+    if (!sid || !art?.url || !art?.source_id) continue;
+    const src = sourceById.get(art.source_id);
+    if (!src?.name) continue;
     const arr = out.get(sid) ?? [];
-    arr.push({ name: source.name as string, url: article.url as string });
+    arr.push({ name: src.name, url: art.url });
     out.set(sid, arr);
   }
 
@@ -151,38 +176,66 @@ export async function getStoryDetail(storyId: string): Promise<StoryDetail | nul
   if (stErr) throw stErr;
   if (!story) return null;
 
-  type SourceJoin = { name: string; homepage_url: string | null; weight: number | null };
-  type ArticleJoin = {
+  type StoryArticleRow = { story_id: string; article_id: string };
+  const { data: saRows, error: saErr } = await supabase
+    .from("story_articles")
+    .select("story_id,article_id")
+    .eq("story_id", storyId);
+  if (saErr) throw saErr;
+
+  const articleIds = Array.from(
+    new Set((saRows ?? []).map((r) => (r as StoryArticleRow).article_id).filter(Boolean)),
+  );
+  if (articleIds.length === 0) {
+    return {
+      id: story.id,
+      lang: story.lang,
+      title: story.title,
+      first_seen_at: story.first_seen_at,
+      last_seen_at: story.last_seen_at,
+      sources: [],
+    };
+  }
+
+  type ArticleRow = {
+    id: string;
     url: string;
     title: string;
     published_at: string | null;
-    sources: SourceJoin | null;
+    source_id: string;
   };
-  type StoryArticleJoinRow = { story_id: string; articles: ArticleJoin | null };
+  const { data: articles, error: aErr } = await supabase
+    .from("articles")
+    .select("id,url,title,published_at,source_id")
+    .in("id", articleIds);
+  if (aErr) throw aErr;
 
-  const { data: rows, error: rowsErr } = await supabase
-    .from("story_articles")
-    .select(
-      "story_id, articles:article_id(url,title,published_at, sources:source_id(name,homepage_url,weight))",
-    )
-    .eq("story_id", storyId);
-  if (rowsErr) throw rowsErr;
+  const sourceIds = Array.from(new Set((articles ?? []).map((a) => (a as ArticleRow).source_id)));
+  type SourceRow = { id: string; name: string; homepage_url: string | null };
+  const { data: sourcesRows, error: sErr } = await supabase
+    .from("sources")
+    .select("id,name,homepage_url")
+    .in("id", sourceIds);
+  if (sErr) throw sErr;
 
-  const sources =
-    ((rows ?? []) as unknown as StoryArticleJoinRow[])
-      .map((row) => {
-        const a = row.articles;
-        const s = a?.sources;
-        if (!a?.url || !a?.title || !s?.name) return null;
-        return {
-          source_name: s.name,
-          source_homepage: s.homepage_url ?? "",
-          article_url: a.url,
-          article_title: a.title,
-          published_at: a.published_at ?? null,
-        };
-      })
-      .filter(Boolean) as StoryDetail["sources"];
+  const sourceById = new Map<string, SourceRow>(
+    (sourcesRows ?? []).map((s) => [s.id, s as SourceRow]),
+  );
+
+  const sources = (articles ?? [])
+    .map((a) => {
+      const art = a as ArticleRow;
+      const src = sourceById.get(art.source_id);
+      if (!src?.name || !art.url || !art.title) return null;
+      return {
+        source_name: src.name,
+        source_homepage: src.homepage_url ?? "",
+        article_url: art.url,
+        article_title: art.title,
+        published_at: art.published_at ?? null,
+      };
+    })
+    .filter(Boolean) as StoryDetail["sources"];
 
   sources.sort((x, y) => {
     const xt = x.published_at ? Date.parse(x.published_at) : 0;
