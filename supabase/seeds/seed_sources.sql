@@ -1,4 +1,4 @@
--- Seed default sources (EN:22, ZH:8)
+-- Seed default sources (EN:32, ZH:8)
 -- Run after schema.sql in Supabase SQL Editor.
 
 insert into public.sources (name, homepage_url, rss_url, lang, weight, enabled)
@@ -30,12 +30,32 @@ values
   ('The Block', 'https://www.theblock.co/', 'https://www.theblock.co/rss.xml', 'en', 2, true),
   ('CryptoDaily', 'https://cryptodaily.co.uk/', 'https://cryptodaily.co.uk/feed/', 'en', 2, true),
 
+  -- EN (fast/briefs style)
+  -- NOTE: These are generally shorter, higher-frequency items (more like "快讯/简报").
+  ('Techmeme', 'https://www.techmeme.com/', 'https://www.techmeme.com/feed.xml', 'en', 1.5, true),
+  ('Hacker News (hnrss)', 'https://news.ycombinator.com/', 'https://hnrss.org/frontpage', 'en', 1.5, true),
+  ('BBC News - Technology', 'https://www.bbc.co.uk/news/technology', 'https://feeds.bbci.co.uk/news/technology/rss.xml', 'en', 1.5, true),
+  ('BBC News - World', 'https://www.bbc.co.uk/news/world', 'https://feeds.bbci.co.uk/news/world/rss.xml', 'en', 1.5, true),
+  ('Reddit - r/CryptoCurrency', 'https://www.reddit.com/r/CryptoCurrency/', 'https://www.reddit.com/r/CryptoCurrency/.rss', 'en', 1.2, true),
+  ('Reddit - r/Bitcoin', 'https://www.reddit.com/r/Bitcoin/', 'https://www.reddit.com/r/Bitcoin/.rss', 'en', 1.2, true),
+  ('Reddit - r/Ethereum', 'https://www.reddit.com/r/ethereum/', 'https://www.reddit.com/r/ethereum/.rss', 'en', 1.2, true),
+  ('Reddit - r/defi', 'https://www.reddit.com/r/defi/', 'https://www.reddit.com/r/defi/.rss', 'en', 1.2, true),
+  -- More high-frequency crypto community feeds (headline-like, not long-form articles)
+  ('Reddit - r/BitcoinMarkets', 'https://www.reddit.com/r/BitcoinMarkets/', 'https://www.reddit.com/r/BitcoinMarkets/.rss', 'en', 1.1, true),
+  ('Reddit - r/CryptoMarkets', 'https://www.reddit.com/r/CryptoMarkets/', 'https://www.reddit.com/r/CryptoMarkets/.rss', 'en', 1.1, true),
+  ('Reddit - r/solana', 'https://www.reddit.com/r/solana/', 'https://www.reddit.com/r/solana/.rss', 'en', 1.1, true),
+  ('Reddit - r/ethfinance', 'https://www.reddit.com/r/ethfinance/', 'https://www.reddit.com/r/ethfinance/.rss', 'en', 1.1, true),
+  ('Reddit - r/Chainlink', 'https://www.reddit.com/r/Chainlink/', 'https://www.reddit.com/r/Chainlink/.rss', 'en', 1.0, true),
+  ('CoinDesk - Markets', 'https://www.coindesk.com/markets/', 'https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml&section=markets', 'en', 2, true),
+  ('Cointelegraph - Market News', 'https://cointelegraph.com/tags/market-news', 'https://cointelegraph.com/rss/tag/market-news', 'en', 2, true),
+
   -- ZH (RSS may be absent/unstable; ingest script will attempt RSS auto-discovery when rss_url is null)
   ('金色财经', 'https://www.jinse.cn/', null, 'zh', 3, true),
-  ('Odaily 星球日报', 'https://www.odaily.news/', null, 'zh', 3, true),
-  ('PANews', 'https://www.panewslab.com/', null, 'zh', 3, true),
-  ('BlockBeats 律动', 'https://www.theblockbeats.info/', null, 'zh', 3, true),
-  ('链捕手 ChainCatcher', 'https://www.chaincatcher.com/', null, 'zh', 2, true),
+  ('Odaily 星球日报', 'https://www.odaily.news/', 'https://rss.odaily.news/rss/newsflash', 'zh', 3, true),
+  ('PANews', 'https://www.panewslab.com/', 'https://www.panewslab.com/en/rss/newsflash.xml', 'zh', 3, true),
+  -- BlockBeats Flash/快讯 RSS (你提供的可用地址)
+  ('BlockBeats 律动', 'https://www.theblockbeats.info/', 'https://api.theblockbeats.news/v1/open-api/home-xml', 'zh', 3, true),
+  ('链捕手 ChainCatcher', 'https://www.chaincatcher.com/', 'https://www.chaincatcher.com/rss/clist', 'zh', 2, true),
   ('深潮 TechFlow', 'https://www.techflowpost.com/', null, 'zh', 2, true),
   ('Foresight News', 'https://foresightnews.pro/', null, 'zh', 2, true),
   ('吴说区块链', 'https://wublockchain.xyz/', null, 'zh', 2, true)

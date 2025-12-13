@@ -89,6 +89,25 @@ function normalizeUrl(raw) {
   }
 }
 
+function normalizeRssUrl(raw, homepageUrl) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // absolute URL
+  try {
+    return new URL(s).toString();
+  } catch {}
+  // relative URL (best-effort)
+  if (homepageUrl) {
+    try {
+      return new URL(s, homepageUrl).toString();
+    } catch {}
+  }
+  // common mistake: missing scheme
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(s)) return `https://${s}`;
+  return s;
+}
+
 function stripPunct(s) {
   return s
     .replace(/[\u2000-\u206F\u2E00-\u2E7F'!"#$%&()*+,\-.\/:;<=>?@[\\\]^_`{|}~]/g, " ")
@@ -242,6 +261,7 @@ async function main() {
           await supabase.from("sources").update({ rss_url: rssUrl }).eq("id", source.id);
         }
       }
+      rssUrl = normalizeRssUrl(rssUrl, source.homepage_url);
       if (!rssUrl) {
         await supabase
           .from("sources")
