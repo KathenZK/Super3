@@ -42,6 +42,27 @@ const MAX_STORY_CANDIDATES = 250;
 const TITLE_SIM_THRESHOLD_EN = 0.78;
 const TITLE_SIM_THRESHOLD_ZH = 0.72;
 
+function normalizeTitleForTokens(title) {
+  const t = String(title ?? "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase();
+
+  // Unify common entity aliases to reduce cross-source variance (keep this list short and high-confidence).
+  return (
+    t
+      .replace(/\bbinance\b/gi, "binance")
+      .replace(/币安/gu, "binance")
+      .replace(/\bokx\b/gi, "okx")
+      .replace(/欧易/gu, "okx")
+      .replace(/\bhuobi\b/gi, "huobi")
+      .replace(/火币/gu, "huobi")
+      .replace(/\bbybit\b/gi, "bybit")
+      // remove very common newsflash filler tokens that add noise
+      .replace(/(快讯|消息|日讯)/gu, "")
+  );
+}
+
 function mustGetEnv(name) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env var: ${name}`);
@@ -215,14 +236,42 @@ function tokensEn(title) {
 
 function tokensZh(title) {
   // Simple bigram tokenization over CJK+alnum (works reasonably for strict dedupe)
-  const cleaned = title
+  // + light normalization for common aliases and tickers.
+  const cleaned = normalizeTitleForTokens(title)
     .replace(/\s+/g, "")
     .replace(/[^\p{Script=Han}a-zA-Z0-9]+/gu, "");
   const out = [];
   for (let i = 0; i < cleaned.length - 1; i++) out.push(cleaned.slice(i, i + 2));
   // also include full alnum runs (e.g. BTC, ETH, 2025)
-  const alnums = cleaned.match(/[a-zA-Z0-9]{2,}/g) ?? [];
-  return [...out, ...alnums];
+  const alnums = cleaned.match(/[a-z0-9]{2,}/g) ?? [];
+
+  const QUOTES = [
+    "usdt",
+    "usdc",
+    "usd",
+    "btc",
+    "eth",
+    "bnb",
+    "sol",
+    "xrp",
+    "doge",
+    "perp",
+  ];
+
+  for (const run of alnums) {
+    out.push(run);
+    for (const q of QUOTES) {
+      if (!run.endsWith(q)) continue;
+      const base = run.slice(0, -q.length);
+      if (base.length >= 2) {
+        out.push(base);
+        out.push(q);
+      }
+      break;
+    }
+  }
+
+  return out;
 }
 
 function jaccard(a, b) {
