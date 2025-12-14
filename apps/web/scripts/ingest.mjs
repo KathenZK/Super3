@@ -1,5 +1,39 @@
 import RSSParser from "rss-parser";
 import { createClient } from "@supabase/supabase-js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+function loadLocalEnv() {
+  // Next.js automatically loads `.env*` for the app runtime, but this script is
+  // executed via `node scripts/ingest.mjs`, so we load `.env.local` ourselves.
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const root = path.resolve(__dirname, "..");
+
+  const candidates = [path.join(root, ".env.local"), path.join(root, ".env")];
+  for (const p of candidates) {
+    if (!fs.existsSync(p)) continue;
+    const text = fs.readFileSync(p, "utf8");
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if (
+        (val.startsWith("\"") && val.endsWith("\"")) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (key && process.env[key] === undefined) process.env[key] = val;
+    }
+  }
+}
+
+loadLocalEnv();
 
 const MERGE_WINDOW_HOURS = 48;
 // Hot ranking is computed via Supabase view `stories_feed_hot_24h` at query time.
