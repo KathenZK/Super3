@@ -7,6 +7,10 @@ function fmt(iso: string) {
   return d.toLocaleString();
 }
 
+function langLabel(lang: "en" | "zh" | "multi") {
+  return lang === "multi" ? "MIX" : lang.toUpperCase();
+}
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -60,7 +64,7 @@ export default async function SearchPage({
             className="block rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-300"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-zinc-500">{st.lang.toUpperCase()}</div>
+                <div className="text-xs text-zinc-500">{langLabel(st.lang)}</div>
               <div className="text-xs text-zinc-500">{fmt(st.last_seen_at)}</div>
             </div>
             <div className="mt-2 text-sm font-medium text-zinc-900">{st.title}</div>

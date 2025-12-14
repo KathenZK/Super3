@@ -2,6 +2,8 @@
 -- Apply this in Supabase SQL Editor.
 
 create extension if not exists pgcrypto;
+-- For semantic merge (embeddings / vector similarity)
+create extension if not exists vector;
 
 -- Sources (sites)
 create table if not exists public.sources (
@@ -39,17 +41,24 @@ create index if not exists articles_lang_published_at_idx on public.articles (la
 -- Stories (event-level aggregation)
 create table if not exists public.stories (
   id uuid primary key default gen_random_uuid(),
-  lang text not null check (lang in ('en','zh')),
+  -- 'multi' means this story has sources in multiple languages (semantic merge).
+  lang text not null check (lang in ('en','zh','multi')),
   title text not null,
   first_seen_at timestamptz not null,
   last_seen_at timestamptz not null,
   hot_score double precision not null default 0,
+  -- Optional: semantic embedding for the story title (vector dim must match your embedding model)
+  embedding vector(1536),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists stories_lang_last_seen_idx on public.stories (lang, last_seen_at desc);
 create index if not exists stories_lang_hot_score_idx on public.stories (lang, hot_score desc);
+-- Vector index (optional but recommended if you plan to query via SQL similarity search)
+create index if not exists stories_embedding_hnsw_idx
+  on public.stories
+  using hnsw (embedding vector_cosine_ops);
 
 -- Join: which articles belong to which story
 create table if not exists public.story_articles (

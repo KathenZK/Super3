@@ -8,6 +8,10 @@ function fmt(iso: string | null) {
   return d.toLocaleString();
 }
 
+function langLabel(lang: "en" | "zh" | "multi") {
+  return lang === "multi" ? "MIX" : lang.toUpperCase();
+}
+
 export default async function StoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const story = await getStoryDetail(id);
@@ -29,7 +33,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
           ← Back
         </Link>
         <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-700">
-          {story.lang.toUpperCase()}
+          {langLabel(story.lang)}
         </span>
       </div>
 

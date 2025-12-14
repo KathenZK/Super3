@@ -5,7 +5,7 @@ export type Sort = "new" | "hot";
 
 export type StoryListItem = {
   id: string;
-  lang: "en" | "zh";
+  lang: "en" | "zh" | "multi";
   title: string;
   excerpt?: string | null;
   first_seen_at: string;
@@ -17,7 +17,7 @@ export type StoryListItem = {
 
 export type StoryDetail = {
   id: string;
-  lang: "en" | "zh";
+  lang: "en" | "zh" | "multi";
   title: string;
   first_seen_at: string;
   last_seen_at: string;
@@ -170,7 +170,7 @@ export async function listStories(args: {
 
   type NewRow = {
     id: string;
-    lang: "en" | "zh";
+    lang: "en" | "zh" | "multi";
     title: string;
     first_seen_at: string;
     last_seen_at: string;
@@ -185,7 +185,7 @@ export async function listStories(args: {
       .gte("last_seen_at", hotWindowStart)
       .order("hot_score_calc", { ascending: false })
       .range(offset, offset + limit - 1);
-    if (langFilter) q = q.eq("lang", langFilter);
+    if (langFilter) q = q.in("lang", [langFilter, "multi"]);
     const { data, error } = await q;
     if (error) throw error;
     rows = (data ?? []) as HotRow[];
@@ -196,7 +196,7 @@ export async function listStories(args: {
       .gte("last_seen_at", newWindowStart)
       .order("last_seen_at", { ascending: false })
       .range(offset, offset + limit - 1);
-    if (langFilter) q = q.eq("lang", langFilter);
+    if (langFilter) q = q.in("lang", [langFilter, "multi"]);
     const { data, error } = await q;
     if (error) throw error;
     rows = (data ?? []) as NewRow[];
@@ -328,7 +328,7 @@ export async function searchStories(args: {
     .ilike("title", `%${q}%`)
     .order("last_seen_at", { ascending: false })
     .limit(limit);
-  if (langFilter) query = query.eq("lang", langFilter);
+  if (langFilter) query = query.in("lang", [langFilter, "multi"]);
 
   const { data, error } = await query;
   if (error) throw error;

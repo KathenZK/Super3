@@ -32,6 +32,19 @@ Web3 新闻聚合（Stories-first）：先把同一事件在多个站点/多篇�
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
+### （可选）语义合并 / 跨语言 Story（方案 A）
+
+默认仍是“标题 token 相似度”合并；如果你希望 **跨语言语义合并**（同一事件的 EN/ZH 标题也能合到同一个 Story），需要：
+
+1) 在 Supabase 执行 `supabase/schema.sql`（包含 `pgvector` / `stories.embedding`）
+2) 给采集脚本配置以下环境变量（仅服务端 / Actions）：
+   - `SEMANTIC_MERGE=true`
+   - `OPENAI_API_KEY`（用于生成 embeddings）
+   - `OPENAI_EMBED_MODEL`（默认 `text-embedding-3-small`，维度 1536）
+   - `SEMANTIC_SIM_THRESHOLD`（默认 `0.86`，越高越“严格”）
+
+> 说明：启用后，Story 可能会被标记为 `multi`（前端显示为 `MIX`），表示同一个 Story 下包含多语言来源。
+
 ## 本地运行（可选）
 
 ```bash

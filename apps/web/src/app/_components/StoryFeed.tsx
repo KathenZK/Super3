@@ -8,13 +8,17 @@ type FeedSort = "hot" | "new";
 
 type StoryListItem = {
   id: string;
-  lang: "en" | "zh";
+  lang: "en" | "zh" | "multi";
   title: string;
   excerpt?: string | null;
   first_seen_at: string;
   last_seen_at: string;
   sources_preview: Array<{ name: string; url: string }>;
 };
+
+function langLabel(lang: StoryListItem["lang"]) {
+  return lang === "multi" ? "MIX" : lang.toUpperCase();
+}
 
 function fmt(iso: string) {
   const d = new Date(iso);
@@ -121,7 +125,7 @@ export function StoryFeed(props: {
           className="block rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-300"
         >
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-zinc-500">{st.lang.toUpperCase()}</div>
+            <div className="text-xs text-zinc-500">{langLabel(st.lang)}</div>
             <div className="text-xs text-zinc-500">{fmt(st.last_seen_at)}</div>
           </div>
           <div className="mt-2 text-sm font-medium text-zinc-900">{st.title}</div>

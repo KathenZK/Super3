@@ -41,6 +41,7 @@ const MERGE_WINDOW_HOURS = 48;
 const MAX_STORY_CANDIDATES = 250;
 const TITLE_SIM_THRESHOLD_EN = 0.78;
 const TITLE_SIM_THRESHOLD_ZH = 0.72;
+const SEMANTIC_SIM_THRESHOLD = Number(process.env.SEMANTIC_SIM_THRESHOLD ?? "0.86");
 
 function normalizeTitleForTokens(title) {
   const t = String(title ?? "")
@@ -76,6 +77,15 @@ function parseIntEnv(name, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function parseBoolEnv(name, fallback = false) {
+  const v = process.env[name];
+  if (v === undefined) return fallback;
+  const s = String(v).trim().toLowerCase();
+  if (["1", "true", "yes", "y", "on"].includes(s)) return true;
+  if (["0", "false", "no", "n", "off"].includes(s)) return false;
+  return fallback;
+}
+
 function hash32(str) {
   // Simple stable non-crypto hash for sharding
   let h = 2166136261;
@@ -96,6 +106,96 @@ function hoursAgoIso(hours) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchJsonWithRetry(url, opts, retries = 2) {
+  let lastErr = null;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutMs = 20000;
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, { ...opts, signal: controller.signal });
+      clearTimeout(t);
+      const text = await res.text();
+      if (!res.ok) {
+        const retryable = new Set([408, 429, 500, 502, 503, 504]);
+        if (!retryable.has(res.status) || i === retries) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}: ${text.slice(0, 300)}`);
+        }
+        await sleep(800 * (i + 1));
+        continue;
+      }
+      return text ? JSON.parse(text) : null;
+    } catch (e) {
+      lastErr = e;
+      if (i === retries) break;
+      await sleep(800 * (i + 1));
+    }
+  }
+  throw lastErr ?? new Error("fetch json failed");
+}
+
+function cosineSim(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = Number(a[i]);
+    const y = Number(b[i]);
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom > 0 ? dot / denom : 0;
+}
+
+function parseVector(v) {
+  if (!v) return null;
+  if (Array.isArray(v)) return v.map(Number);
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return null;
+    if (s.startsWith("[")) {
+      try {
+        const arr = JSON.parse(s);
+        if (Array.isArray(arr)) return arr.map(Number);
+      } catch {}
+    }
+    // fallback: "{1,2,3}" or "1,2,3"
+    const nums = s
+      .replace(/^[{\[]/, "")
+      .replace(/[}\]]$/, "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .map(Number);
+    return nums.length > 0 && nums.every((n) => Number.isFinite(n)) ? nums : null;
+  }
+  return null;
+}
+
+async function getEmbeddingOpenAI(input) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("Missing env var: OPENAI_API_KEY");
+  const model = process.env.OPENAI_EMBED_MODEL || "text-embedding-3-small";
+  const json = await fetchJsonWithRetry(
+    "https://api.openai.com/v1/embeddings",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, input }),
+    },
+    2,
+  );
+  const vec = json?.data?.[0]?.embedding;
+  if (!Array.isArray(vec)) throw new Error("Invalid embeddings response");
+  return vec.map(Number);
 }
 
 async function fetchTextWithRetry(url, opts, retries = 2) {
@@ -333,6 +433,7 @@ async function main() {
   const SUPABASE_SERVICE_ROLE_KEY = mustGetEnv("SUPABASE_SERVICE_ROLE_KEY");
   const SHARD_TOTAL = Math.max(1, parseIntEnv("SHARD_TOTAL", 1));
   const SHARD_INDEX = Math.min(Math.max(0, parseIntEnv("SHARD_INDEX", 0)), SHARD_TOTAL - 1);
+  const SEMANTIC_MERGE = parseBoolEnv("SEMANTIC_MERGE", false);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -386,22 +487,26 @@ async function main() {
       const items = Array.isArray(feed.items) ? feed.items : [];
       let inserted = 0;
 
-      // prefetch candidate stories (same lang, within 48h) once per source run
+      // prefetch candidate stories (within 48h) once per source run
       const mergeWindowStart = hoursAgoIso(MERGE_WINDOW_HOURS);
-      const { data: candidateStories, error: candErr } = await supabase
+      let candQuery = supabase
         .from("stories")
-        .select("id,title,lang,first_seen_at,last_seen_at")
-        .eq("lang", source.lang)
+        .select("id,title,lang,first_seen_at,last_seen_at,embedding")
         .gte("last_seen_at", mergeWindowStart)
         .order("last_seen_at", { ascending: false })
         .limit(MAX_STORY_CANDIDATES);
+      if (!SEMANTIC_MERGE) candQuery = candQuery.eq("lang", source.lang);
+      const { data: candidateStories, error: candErr } = await candQuery;
       if (candErr) throw candErr;
 
       const candTokenCache = new Map();
+      const candEmbCache = new Map();
       for (const st of candidateStories) {
         const toks =
           st.lang === "zh" ? tokensZh(st.title ?? "") : tokensEn(st.title ?? "");
         candTokenCache.set(st.id, toks);
+        const emb = parseVector(st.embedding);
+        if (emb) candEmbCache.set(st.id, emb);
       }
 
       // Limit items processed per source per run to keep the job within GitHub Actions timeouts.
@@ -445,14 +550,44 @@ async function main() {
         const artTokens = art.lang === "zh" ? tokensZh(art.title) : tokensEn(art.title);
         const threshold = art.lang === "zh" ? TITLE_SIM_THRESHOLD_ZH : TITLE_SIM_THRESHOLD_EN;
 
-        let best = { storyId: null, score: 0 };
-        for (const st of candidateStories) {
-          const stTokens = candTokenCache.get(st.id) ?? [];
-          const score = jaccard(artTokens, stTokens);
-          if (score > best.score) best = { storyId: st.id, score };
+        let artEmbedding = null;
+        if (SEMANTIC_MERGE) {
+          try {
+            artEmbedding = await getEmbeddingOpenAI(art.title);
+          } catch (e) {
+            console.log(
+              `  ! semantic disabled for this item: ${e?.message ? String(e.message) : String(e)}`,
+            );
+            artEmbedding = null;
+          }
         }
 
-        let storyId = best.score >= threshold ? best.storyId : null;
+        // 1) Semantic match (cross-language), if embeddings available
+        let semanticBest = { storyId: null, score: 0 };
+        if (artEmbedding) {
+          for (const st of candidateStories) {
+            const stEmb = candEmbCache.get(st.id);
+            if (!stEmb) continue;
+            const score = cosineSim(artEmbedding, stEmb);
+            if (score > semanticBest.score) semanticBest = { storyId: st.id, score };
+          }
+        }
+
+        // 2) Fallback token match (same-language only)
+        let tokenBest = { storyId: null, score: 0 };
+        for (const st of candidateStories) {
+          if (st.lang !== art.lang) continue;
+          const stTokens = candTokenCache.get(st.id) ?? [];
+          const score = jaccard(artTokens, stTokens);
+          if (score > tokenBest.score) tokenBest = { storyId: st.id, score };
+        }
+
+        let storyId =
+          semanticBest.storyId && semanticBest.score >= SEMANTIC_SIM_THRESHOLD
+            ? semanticBest.storyId
+            : tokenBest.score >= threshold
+              ? tokenBest.storyId
+              : null;
         if (!storyId) {
           const fs = art.published_at ?? nowIso();
           const { data: newStory, error: stErr } = await supabase
@@ -462,21 +597,41 @@ async function main() {
               title: art.title,
               first_seen_at: fs,
               last_seen_at: fs,
+              embedding: artEmbedding ?? null,
             })
-            .select("id,title,lang,first_seen_at,last_seen_at")
+            .select("id,title,lang,first_seen_at,last_seen_at,embedding")
             .single();
           if (stErr) throw stErr;
           storyId = newStory.id;
           // add to in-memory candidates so later items can merge into it
           candidateStories.unshift(newStory);
           candTokenCache.set(newStory.id, artTokens);
+          if (artEmbedding) candEmbCache.set(newStory.id, artEmbedding);
         } else {
           // update story last_seen_at if this article is newer
           const latest = art.published_at ?? nowIso();
+          const stRow = candidateStories.find((x) => x.id === storyId);
+          const stLang = stRow?.lang ?? null;
+          const nextLang =
+            stLang && stLang !== "multi" && stLang !== art.lang ? "multi" : stLang ?? art.lang;
+          const patch = {
+            last_seen_at: latest,
+            lang: nextLang,
+            embedding: stRow?.embedding ? undefined : artEmbedding ?? undefined,
+          };
+          for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
           await supabase
             .from("stories")
-            .update({ last_seen_at: latest })
+            .update(patch)
             .eq("id", storyId);
+
+          // keep in-memory candidate up to date for later items
+          if (stRow) {
+            stRow.last_seen_at = latest;
+            stRow.lang = nextLang;
+            if (!stRow.embedding && artEmbedding) stRow.embedding = artEmbedding;
+            if (!candEmbCache.get(stRow.id) && artEmbedding) candEmbCache.set(stRow.id, artEmbedding);
+          }
         }
 
         const { error: saErr } = await supabase

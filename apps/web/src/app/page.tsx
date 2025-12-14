@@ -24,13 +24,20 @@ export default async function Home({
     return d.toLocaleString();
   }
 
+  function langLabel(langValue: "en" | "zh" | "multi") {
+    return langValue === "multi" ? "MIX" : langValue.toUpperCase();
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center px-6 py-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="text-lg font-semibold">Super3</div>
           </div>
+          <Link href="/search" className="text-sm text-zinc-500 hover:text-zinc-900">
+            Advanced →
+          </Link>
         </div>
       </header>
 
@@ -50,7 +57,7 @@ export default async function Home({
                   className="block rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-300"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs text-zinc-500">{st.lang.toUpperCase()}</div>
+                    <div className="text-xs text-zinc-500">{langLabel(st.lang)}</div>
                     <div className="text-xs text-zinc-500">{fmt(st.last_seen_at)}</div>
                   </div>
                   <div className="mt-2 text-sm font-medium text-zinc-900">{st.title}</div>
