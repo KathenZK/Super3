@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listStories } from "@/lib/stories";
 import { StoryFeed } from "./_components/StoryFeed";
+import { StoryFilters } from "./_components/StoryFilters";
 
 export default async function Home({
   searchParams,
@@ -30,40 +31,7 @@ export default async function Home({
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        <form action="/" className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-2">
-            <button
-              name="sort"
-              value="new"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                sort === "new" ? "bg-zinc-900 text-white" : "bg-white text-zinc-800 border border-zinc-200"
-              }`}
-            >
-              New
-            </button>
-            <button
-              name="sort"
-              value="hot"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                sort === "hot" ? "bg-zinc-900 text-white" : "bg-white text-zinc-800 border border-zinc-200"
-              }`}
-            >
-              Hot (24h)
-            </button>
-          </div>
-          <select
-            name="lang"
-            defaultValue={lang}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="all">All</option>
-            <option value="en">EN</option>
-            <option value="zh">ZH</option>
-          </select>
-          <button className="rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-200">
-            Apply
-          </button>
-        </form>
+        <StoryFilters sort={sort} lang={lang} />
 
         <StoryFeed initialItems={items} sort={sort} lang={lang} />
       </main>
