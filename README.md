@@ -39,11 +39,14 @@ Web3 新闻聚合（Stories-first）：先把同一事件在多个站点/多篇�
 1) 在 Supabase 执行 `supabase/schema.sql`（包含 `pgvector` / `stories.embedding`）
 2) 给采集脚本配置以下环境变量（仅服务端 / Actions）：
    - `SEMANTIC_MERGE=true`
-   - `OPENAI_API_KEY`（用于生成 embeddings）
-   - `OPENAI_EMBED_MODEL`（默认 `text-embedding-3-small`，维度 1536）
+   - `EMBEDDINGS_API_KEY`（用于生成 embeddings；可用 OpenAI key 或 OpenRouter key）
+   - `EMBEDDINGS_BASE_URL`（OpenAI-compatible base；OpenAI 默认 `https://api.openai.com/v1`；OpenRouter 用 `https://openrouter.ai/api/v1`）
+   - `EMBEDDINGS_MODEL`（默认 `text-embedding-3-small`；如果用 OpenRouter，可填你选择的 embedding 模型名）
    - `SEMANTIC_SIM_THRESHOLD`（默认 `0.86`，越高越“严格”）
 
 > 说明：启用后，Story 可能会被标记为 `multi`（前端显示为 `MIX`），表示同一个 Story 下包含多语言来源。
+>
+> 注意：数据库字段目前是 `vector(1536)`，所以 embedding 模型输出维度需要是 1536；如果你选的是 768/1024/4096 等维度模型，需要同步修改 `supabase/schema.sql` 里的维度。
 
 ## 本地运行（可选）
 

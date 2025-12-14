@@ -177,18 +177,35 @@ function parseVector(v) {
   return null;
 }
 
-async function getEmbeddingOpenAI(input) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing env var: OPENAI_API_KEY");
-  const model = process.env.OPENAI_EMBED_MODEL || "text-embedding-3-small";
+async function getEmbedding(input) {
+  const apiKey =
+    process.env.EMBEDDINGS_API_KEY ?? process.env.OPENAI_API_KEY ?? process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing env var: EMBEDDINGS_API_KEY (or OPENAI_API_KEY / OPENROUTER_API_KEY)");
+  }
+
+  // OpenAI-compatible API base. For OpenRouter, set: https://openrouter.ai/api/v1
+  const baseUrl = (process.env.EMBEDDINGS_BASE_URL ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1")
+    .replace(/\/+$/, "");
+  const url = `${baseUrl}/embeddings`;
+
+  const model =
+    process.env.EMBEDDINGS_MODEL ?? process.env.OPENAI_EMBED_MODEL ?? "text-embedding-3-small";
+
+  const headers = {
+    "content-type": "application/json",
+    authorization: `Bearer ${apiKey}`,
+  };
+
+  // Optional OpenRouter attribution headers (recommended by OpenRouter docs).
+  if (process.env.OPENROUTER_REFERER) headers["HTTP-Referer"] = process.env.OPENROUTER_REFERER;
+  if (process.env.OPENROUTER_TITLE) headers["X-Title"] = process.env.OPENROUTER_TITLE;
+
   const json = await fetchJsonWithRetry(
-    "https://api.openai.com/v1/embeddings",
+    url,
     {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify({ model, input }),
     },
     2,
@@ -553,7 +570,7 @@ async function main() {
         let artEmbedding = null;
         if (SEMANTIC_MERGE) {
           try {
-            artEmbedding = await getEmbeddingOpenAI(art.title);
+            artEmbedding = await getEmbedding(art.title);
           } catch (e) {
             console.log(
               `  ! semantic disabled for this item: ${e?.message ? String(e.message) : String(e)}`,
