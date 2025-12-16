@@ -34,6 +34,10 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SEMANTIC_MERGE: "true"
+          EMBEDDINGS_BASE_URL: "https://openrouter.ai/api/v1"
+          EMBEDDINGS_MODEL: "openai/text-embedding-3-small"
+          EMBEDDINGS_API_KEY: ${{ secrets.EMBEDDINGS_API_KEY }}
           SHARD_TOTAL: "4"
           SHARD_INDEX: "${{ matrix.shard }}"
         run: npm run ingest

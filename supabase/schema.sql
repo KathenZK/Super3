@@ -53,6 +53,49 @@ create table if not exists public.stories (
   updated_at timestamptz not null default now()
 );
 
+-- If you applied an earlier schema before semantic merge, the table already exists and
+-- `create table if not exists` will NOT add new columns/constraints. The following
+-- ALTERs keep the schema idempotent.
+
+-- Add embedding column for existing installs.
+alter table public.stories
+  add column if not exists embedding vector(1536);
+
+-- Ensure lang constraint allows 'multi' for existing installs.
+do $$
+declare
+  con_to_drop text;
+begin
+  -- Find a CHECK constraint on stories.lang that does NOT include 'multi' and drop it.
+  select c.conname into con_to_drop
+  from pg_constraint c
+  join pg_class t on t.oid = c.conrelid
+  join pg_namespace n on n.oid = t.relnamespace
+  where n.nspname = 'public'
+    and t.relname = 'stories'
+    and c.contype = 'c'
+    and pg_get_constraintdef(c.oid) ilike '%lang%'
+    and pg_get_constraintdef(c.oid) ilike '%in%'
+    and pg_get_constraintdef(c.oid) not ilike '%''multi''%';
+
+  if con_to_drop is not null then
+    execute 'alter table public.stories drop constraint ' || quote_ident(con_to_drop);
+  end if;
+
+  -- Add the expected constraint if missing.
+  if not exists (
+    select 1
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public'
+      and t.relname = 'stories'
+      and c.conname = 'stories_lang_check'
+  ) then
+    execute 'alter table public.stories add constraint stories_lang_check check (lang in (''en'',''zh'',''multi''))';
+  end if;
+end $$;
+
 create index if not exists stories_lang_last_seen_idx on public.stories (lang, last_seen_at desc);
 create index if not exists stories_lang_hot_score_idx on public.stories (lang, hot_score desc);
 -- Vector index (optional but recommended if you plan to query via SQL similarity search)
